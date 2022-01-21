@@ -11,5 +11,5 @@ FAST5_subset.sh => this subsets FAST5 files based on read-names
 
 3_map_sort_index.sh => Map long-reads to reference genome with winnowmap. This also converts the sam to a bam file, sorts it and indexes it. 
 
-
+split_on_adapter_adjust.swarm => example swarm file for splitting chimeric reads in fastq files.
 
