@@ -141,7 +141,9 @@ Open file using following:
 $ /etc/security/limits.conf 
 
 Add following line at the end of the file
+
 &#42;               soft    nofile          65535
+
 &#42;               hard    nofile          65535
 
 Save file.
