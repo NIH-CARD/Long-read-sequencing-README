@@ -11,19 +11,55 @@ With this research, we will build a public resource consisting of long-read geno
 
 ## Guppy Analysis
 
-**TL/DR:** MIG2 mode optimized on GCP with persistent use discount is
-roughly **$47.25 ** for average RNA samples at **1.2 TB** and
-**$130.73** for average DNA samples at **1.2 TB**.
+**TL/DR:**
+
+-   Guppy6.1.2 **basecalling+BAM** in MIG2 mode **(using SUP model)** on
+    GCP with persistent use discount for 10 RNA and 97 DNA samples cost
+    a total of **$34290.86**. Please see Figure 3 for detailed
+    calculations.
+-   Guppy6.1.2 **basecalling** in MIG2 mode **(using SUP model)** on GCP
+    with persistent use discount is roughly **$47.25 ** for average RNA
+    samples at **1.2 TB** and **$130.73** for average DNA samples at
+    **1.2 TB**.
+-   **Methylation** (5mC) calling (using Guppy basecalled fastq file)
+    with **minimap2** based alignment costs **$52.25** for average RNA
+    samples at **1.2 TB** and **$145.73** for average DNA samples at
+    **1.2 TB**.
 
 ## Introdunction
 
-Here we present the benchamrking results for guppy basecaller on A100
-GPUs. We benchmarked guppy on a single A100 GPU in multi-instance GPU
-(MIG) mode as well as on 1, 2 and 4 A100 GPU’s in full mode. All our
-estimates are with persistent use mode (30% reduced cost) on GCP.
-Following table shows general specification of A100 (we have used the
-only available (upto our knowledge) A100, 40 GB SMX, 108 streaming
-multiprocessors (SMs) and a toal of 6912 cuda cores).
+A100 GPU on google cloud platform (GCP) can be used in **full** as well
+as in multi-instance GPU **(MIG)** mode. Here we compare our results for
+guppy **basecalling** on 1, 2 and 4 A100 GPUs in **full** mode with
+those obtained from single A100 in **MIG** mode. We also compare our
+results on **methylation-calling** using guppy, minimap2 and nanopolish.
+
+### A100 in MIG mode
+
+Single A100 GPU (40 GB) can be configured in 5 different MIG modes for
+best performance (Table 1). We have tested A100 in 7 (MIG7), 3 (MIG3)
+and 2 (MIG2) GPU instances as well as 1, 2 and 4 A100 GPUs in full mode
+for RNA and DNA samples.
+
+![Table 1. A100 MIG Configurations](A100MIG.jpg)
+
+Source
+<https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#:~:text=The%20new%20Multi%2DInstance%20GPU,resources%20for%20optimal%20GPU%20utilization.>
+
+### A100 configuration and cost (persistent discount) on GCP
+
+Below table show general specification of A100 available on GCP (40 GB
+SMX, 108 streaming multiprocessors (SMs) and a toal of 6912 cuda cores)
+with cost/hr **(persistent use discount 30% reduced cost)** for each
+configuration. In all our calculations we have used A100 with 4TB of
+ssd.
+
+> Please note that Guppy base caller crashes if run on data from gbucket
+> (due to disk latency issues), all these tests were done by attaching a
+> 4TB persistent SSD disk with a2-highgpu-1g VM (default VM for A100
+> GPU). To run more than one samples simultaneously (say 3 with 3
+> multi-instances, we need \~ 7TB of persistent disk as some samples are
+> \> 3 TB)
 
 
     ------------------------------------------------------------------------------------
@@ -38,7 +74,7 @@ multiprocessors (SMs) and a toal of 6912 cuda cores).
      A100-MIG3    10GB    1792    28       64       -      $3.75     12     85GB   4TB  
     ------------------------------------------------------------------------------------
 
-Table 1. A100 (in full and MIG MODE) configurations. Rows 1-2. A100 in
+Table 2. A100 (in full and MIG MODE) configurations. Rows 1-2. A100 in
 **full** mode with 10GB default and 4TB Persistent disk respectively.
 Rows 3-4. A100 in MIG2 and MIG3 modes used for current benchmarking.
 
@@ -47,45 +83,13 @@ For more details on A100 GPU, see
 
 <https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/a100/pdf/nvidia-a100-datasheet-us-nvidia-1758950-r4-web.pdf>
 
-> Please note that Guppy base caller crashes if run on data from gbucket
-> (due to disk latency issues), all these tests were done by attaching a
-> 4TB persistent SSD disk with a2-highgpu-1g VM (default VM for A100
-> GPU). To run more than one samples simultaneously (say 3 with 3
-> multi-instances, we need \~ 7TB of persistent disk as some samples are
-> \> 3 TB)
+### Guppy base- and methylation-calling on A100 GPUs
 
-### A100 in MIG mode
+#### Guppy basecalling
 
-Single A100 GPU (40 GB) can be configured in 5 different GPU instances
-(MIG) for best performance (see Table below). We have tested A100 in 7,
-3 and 2 GPU instances both for RNA and DNA samples. **Results for MIG7
-mode are slower than MIG3 and MIG2 modes and hence are not reported
-here.**
-
-![Table 2. A100 MIG Configurations](A100MIG.jpg)
-
-Source
-<https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#:~:text=The%20new%20Multi%2DInstance%20GPU,resources%20for%20optimal%20GPU%20utilization.>
-
-## Summary
-
-A100 GPU in MIG mode is **almost 0.54** time cheaper than that of single
-A100 in Full mode for RNA samples. In the case of DNA samples, MIG mode
-is **almost 0.68** times cheaper than that of 4 A100 GPUs.
-
-## A100 Performance
-
-We benchmarked guppy base caller in 3 different MIG modes on a single
-A100 GPU as well as single guppy base caller was run on 1, 2 and 4 A100
-GPUs to identify best A100 utilization. See Figure 1 & 2 for details.
-
-> Results for MIG7 mode are slower than MIG3 and MIG2 mode and hence are
-> not reported here.
-
-#### Results
-
-Here we discuss our results for both RNA and DNA samples in MIG and full
-mode.
+Results for guppy basecalling in MIG (MIG2 and MIG3) mode on a single
+A100 GPU as well as on 1 (A100-1), 2 (A100-2) and 4 (A100-4) A100 GPUs
+are shown in Figure 1 & 2 for an RNA and DNA sample (each of 1.2 TB) .
 
 > Please note that in MIG2 mode, an RNA and DNA sample was split into 2
 > different folders (equal number of FASTA5 files) and 2 guppy
@@ -93,25 +97,22 @@ mode.
 > rates (Figure 1A) in mig modes are shown as sum of rates for all
 > instances and total time (Figure 1B) is the average of all instances.
 
-All results in Figure 1 & 2 are based on a sample size of 1.2 TB for
-both RNA and DNA samples.
+As can be seen from Figure 1A, guppy basecalling rate in MIG2 mode is
+**\~2X** faster than in single A100 in full mode and gave comparable
+performance on 2 A100 GPUs in full mode for both RNA and DNA samples.
+Furthermore, total base calling completion time for both RNA and DNA
+samples in MIG2 mode is compareable to that on 2 A100 GPUs in full mode
+(Figure 1B).
+
+> Results for MIG7 mode are slower than MIG3 and MIG2 mode and hence are
+> not reported here.
 
 > Please note that calculations for DNA in full A100 mode (A100-1) were
 > not completed (due to long run time, we terminated the job).
 
-Figure 1A shows guppy base calling rate for a single A100 in MIG3 and
-MIG2 modes as well as A100 in full mode with guppy running on 1
-(A100-1), 2 (A100-2) and 4 (A100-4) A100 GPUs for a single RNA/DNA
-sample. As can be seen from Figure 1A, guppy basecalling rate in MIG2
-mode is **\~2X** faster than in single A100 in full mode and gave
-comparable performance on 2 A100 GPUs in full mode for both RNA and DNA
-samples. Furthermore, total base calling completion time for both RNA
-and DNA samples in MIG2 mode is compareable to that on 2 A100 GPUs in
-full mode (Figure 1B).
-
 ![](A100Benchmarks2_files/figure-markdown_github/unnamed-chunk-5-1.png)
 
-Figure 1. A100 GPU Perfomance in MIG and full mode.
+Figure 1. Guppy basecalling on A100 GPU in MIG and full mode.
 
 Consequently, total cost for RNA and DNA replicates is **\~ 1/2** in
 MIG2 mode than on 2 A100 GPUs in full mode (Figure 1C). Figure 1D gave
@@ -130,14 +131,80 @@ estimate for cost per TB for both DNA and RNA samples.
 > be submit two parallel jobs, one on each MIG machine to maximimize
 > A100 utilization.
 
+In summary, A100 GPU in MIG mode is **almost 0.54** time cheaper than
+that of single A100 in Full mode for RNA samples. In the case of DNA
+samples, MIG mode is **almost 0.68** times cheaper than that of 4 A100
+GPUs.
+
+#### Guppy Basecalling + Alignment (methylation-calling)
+
+Following our optimized setting for guppy basecalling on A100 GPU in
+MIG2 mode, we tested guppy on A100 GPU in MIG2 mode (Figure 2) for
+basecalling and alignment to hg38 reference fasta. Guppy basecalling +
+alignment in MIG2 mode is **almost 2.56 more costly** for RNA sample
+where as for DNA sample it is **1.7 more costly** than basecalling
+alone.
+
+Guppy generated **modified-base bam** file was processed to aggregate
+5mC bases in bedmethyle bed file using modbam2bed script
+<https://github.com/epi2me-labs/modbam2bed> on a 16 vCPUs, 64 GB RAM and
+3TB SSD VM. This step costs **\~$3** for RNA sample and **\~$6** for DNA
+sample.
+
+> For methylation calling, overall this pipeline costs **$147.9** for
+> RNA sample and **$272.18** for DNA sample.
+
+![](A100Benchmarks2_files/figure-markdown_github/unnamed-chunk-6-1.png)
+
+Figure 2. Guppy basecalling and alignment on A100 GPU in MIG2 mode.
+
+### Guppy basecalling on A100 GPUs followed by methylation-calling using minimap2 on 16 vCPUs, 64 GB RAM and 3TB SSD VM
+
+Next we used guppy basecalled fastq file (for passed reads) to generate
+(modified-base) BAM file using minimap2 and process resulting BAM file
+using modbam2bed script (see above). For methylation calling, this
+pipeline incurs, in addition to guppy basecalling cost (Figure 1), an
+additional **\~$5** for RNA and **\~$15** for DNA sample.
+
+> For methylation calling, overall this pipeline costs **$61.7** for RNA
+> sample and **$171.88** for DNA sample.
+
+### Guppy basecalling on A100 GPUs followed by methylation-calling using minimap2 and nanopolish on 16 vCPUs, 64 GB RAM and 3TB SSD VM
+
+Another option we tested on guppy basecalled fastq file (for passed
+reads) to generate (modified-base) BAM file using minimap2 followed by
+nanopolish for methylation calling. This pipeline incurs, in addition to
+guppy basecalling cost (Figure 1), an additional **\~$51** for RNA and
+**\~$62** for DNA sample.
+
+> For methylation calling, overall this pipeline costs **$107.7** for
+> RNA sample and **$218.88** for DNA sample.
+
+### Guppy Basecalling+BAM Cost Prediction for RNA and DNA samples
+
+Based on Guppy6.1.2 in MIG2 mode for Basecalling+BAM calculations, we
+calculated total estimates for 10 RNA and 97 DNA samples.
+
+For 10 RNA samples, total estimates is **$1805.99** and for 97 DNA
+samples, it is **$32484.87**.
+
+Figure 3 shows cost estimate breakdown for each of the RNA and DNA
+samples.
+
+![](A100Benchmarks2_files/figure-markdown_github/unnamed-chunk-7-1.png)
+
+Figure 3. A) RNA and B) DNA samples cost analysis for A100 GPU in MIG2
+mode
+
 ### Cost Prediction for RNA and DNA samples
 
-Next, based on above estimates, we have calculated cost per sample for
-each RNA and DNA sample in various A100 GPU configurations.
+Next, based on above estimates (for guppy basecalling), we have
+calculated cost per sample for each RNA and DNA sample in various A100
+GPU configurations.
 
 #### RNA Samples cost analysis
 
-Figure 2 and Table 1 presents cost estimation for 10 RNA samples. As
+Figure 4 and Table 3 presents cost estimation for 10 RNA samples. As
 seen in Table 1 and Figure 3, cost estimate for each RNA sample is **\~
 1/2** in MIG2 mode than in the case of single A100 in full mode.
 
@@ -183,16 +250,16 @@ a100-1
 </tbody>
 </table>
 
-Table 1. Total cost for 10 RNA samples
+Table 3. Total cost for 10 RNA samples
 
-![](A100Benchmarks2_files/figure-markdown_github/unnamed-chunk-7-1.png)
+![](A100Benchmarks2_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
-Figure 2. RNA samples cost analysis. A) RNA samples sizes, B) Price
+Figure 4. RNA samples cost analysis. A) RNA samples sizes, B) Price
 comparison between MIG2 and single A100 in full mode.
 
 #### DNA Samples cost analysis
 
-Figure 3 and Table 2 show cost analysis for 97 DNA samples. In the case
+Figure 5 and Table 4 show cost analysis for 97 DNA samples. In the case
 of DNA samples, MIG2 mode is the cheapest mode among MIG2, 2 A100 and 4
 A100 GPUs with A100-2 being almost **\~2X** as expensive as MIG2 mode.
 
@@ -238,13 +305,12 @@ A100-4
 </tbody>
 </table>
 
-Table 2. Total cost for 97 DNA samples
+Table 4. Total cost for 97 DNA samples
 
-![](A100Benchmarks2_files/figure-markdown_github/unnamed-chunk-9-1.png)
+![](A100Benchmarks2_files/figure-markdown_github/unnamed-chunk-11-1.png)
 
-Figure 3. DNA samples cost analysis. A) DNA sample sizes, B) Price
+Figure 5. DNA samples cost analysis. A) DNA sample sizes, B) Price
 comparison between MIG2, 2 A100 and 4 A100 GPUs in full mode.
-
 
 ## Publications
 
