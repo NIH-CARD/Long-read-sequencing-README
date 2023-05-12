@@ -87,6 +87,8 @@ For more details on A100 GPU, see
 
 <https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/a100/pdf/nvidia-a100-datasheet-us-nvidia-1758950-r4-web.pdf>
 
+For details on setting up MIG mode on A100 GPUs, Create Compute instance and getting hardware addresses, please see [here](https://codeyarns.com/tech/2020-12-15-how-to-use-mig.html)
+
 ### Guppy base- and methylation-calling on A100 GPUs
 
 #### Guppy basecalling
