@@ -1,96 +1,97 @@
 #!/bin/bash
-#THE ONLY DIFFERENCE (from basecalling only script) IS THE USE OF --bam_out FLAG. ALSO WE ARE NOT USING ANY REFERENCE GENOME HERE BUT YOU CAN ADD IT IF REQUIRED
-#POPULATE SAMPLE FOLDERS LIST - Please make sure that sample directories are properly captured in "samples" array. You might need to change "cut" command
+#Please populate samples to process
+declare -a samples=('HBCC_81948_FTX/PAK94100' 'HBCC_81986_FTX/PAK95500' 'HBCC_81986_FTX/PAK95790' 'HBCC_81987_FTX/PAK64889' 'HBCC_81987_FTX/PAK95613' 'HBCC_81988_FTX/PAK57535' 'HBCC_81988_FTX/PAK64818' 'HBCC_81989_FTX/PAK63420' 'HBCC_81989_FTX/PAK95824' 'HBCC_81997_FTX/PAK69358' 'HBCC_81997_FTX/PAK96150' 'HBCC_81998_FTX/PAK63279')
+#Please populate MIG hardware addresses here. Detailed description on how to setup A100 GPUs in MIG and create Compute instances, please see here (https://codeyarns.com/tech/2020-12-15-how-to-use-mig.html)
+declare -a gpus=('MIG-36490508-d664-5b42-a1a2-c28b6c98cd9e' 'MIG-a45148db-8e85-573d-ac7c-a4081ab6820f' 'MIG-17ad86db-6a10-5e66-9634-087e7bcd7b04' 'MIG-66716305-c5dd-5239-a148-dedcfe6117db' 'MIG-2e37af9d-a8a4-5d77-b19a-56da02211325' 'MIG-de9e7900-2c5b-5103-a0fa-c71701174df0' 'MIG-2efa367a-27ee-5d5a-88e1-bcc8ae1e3fb0' 'MIG-4a046b60-5b4b-5614-98be-125133bd76a6')
 
-declare -a samples=($(ls -d */|cut -d"/" -f1))
-#POPULATE MIG ADDRESSES (Here we have used 4 A100 GPUs in MIG2 mode and hence we have 8 MIG address). PLEASE SEE README.md to get MIG address.
-declare -a gpus=('MIG-0a87138a-788c-55b6-9745-11fdd2228873' 'MIG-eab0e6aa-4c44-5f29-bdb3-d1d7441c42ab' 'MIG-e42c3298-6dec-5ce0-8539-70512752db55' 'MIG-7fd12259-8ede-5c46-84fd-448cc5ef8d30' 'MIG-2acca5f2-2aa7-5428-9c68-1436863244a1' 'MIG-5d458a56-24a7-5cdb-8fc1-fc9eb20a1b6c' 'MIG-4cbb3e78-74a0-5258-9b20-04ed306ad50d' 'MIG-308d1d58-74bc-53c4-905f-8b4318925861')
-i=0
+
+nmigs=8
+i=1
+ts=`date +%s`
 for foldern in "${samples[@]}"
 do
+    
+    echo copying /niadatastore_data/"$foldern" locally
+
+	mkdir -p "$foldern"
+	t11=`date +%s` #keep track of total time used by each sample
+	#echo Copy Start time is "$t11"
+
+	cp /niadatastore_data/"$foldern"/*.fast5 "$foldern"
+	#AS LR-Seq samples are often in TB, we first copy sample on local ssd for optimized throughput
+	echo done copying /niadatastore_data/"$foldern" folder locally
+	sz=$(du -sh "$foldern")
+	echo folder size is: $sz
+	t22=`date +%s`
+	tt=$((t22-t11))
+	echo TOTAL TIME TO COPY SAMPLE "$foldern" is: $tt
 	t1=`date +%s` #keep track of total time used by each sample
-	mkdir -p "$foldern"
-	((i=i+1))
-	
-	#Please adjust this path if your samples are located at different location
-	fn=$(ls ../mountfolder/long/FAST5/$foldern/*.fast5|wc -l) #total number of fast5 files in current sample
-	fn1=$((fn/8+1)) #Here we submit 8 (num of MIGs/GPU * num of GPUS) guppy runs, Please change accordingly
-	
-	echo now starting sample number $i in $foldern with total fast5 files $fn and splitting into two batches of $fn1 files
-	
-	mkdir -p "$foldern"
-	gsutil -q -m rsync -r gs://foundin_long_short/long/FAST5/"$foldern" "$foldern"
+	fn=$(ls "$foldern"/*.fast5|wc -l) #total number of fast5 files in current sample
+	fn1=$((fn/8)) #Here we submit 8 (num of MIGs/GPU * num of GPUS) guppy runs, Please change accordingly
+
+	echo starting sample $i with total fast5 files $fn and splitting into 8 batches of $fn1 files
 	d=1
-        mkdir -p run$d
-        cd run$d
+    mkdir -p run$d
+	cd run$d
 	j=0
-        for ii in ../"$foldern"/*.fast5
-        do
-                ln -s "$ii"
+	for ii in /datastore-8/nguppy/"$foldern"/*.fast5
+	do
+		ln -s "$ii"
 		((j=j+1))
 		if [ $(expr $j % $fn1) == "0" ] #copy upto 1000 files
-                then
+		then
 			((d=d+1))
-                        mkdir -p ../run$d
-                        cd ../run$d
-                fi
-
-        done
-        cd ../
-
+			if [ $d -le $nmigs ] #last folder would get some remainder firles rem=$((fn%8))
+            then
+    			mkdir -p ../run$d
+    			cd ../run$d
+    		fi
+		fi
+	done
+	cd ../
 	d=1
-	
-	#PLEASE NOYE THAT SETTINGS USED FOR GUPPY ARE OPTIMIZED FOR A100 GPU, 40 GB WORKING IN MIG2 MODE. YOU CHANGE THESE IF YOU ARE
-USING DIFFERENT GPU/MIG mode	
 	mkdir -p res_"$foldern"
 	for mig in "${gpus[@]}"
 	do
 	{
-                echo processing sample $foldern for folder run$d
-                OUTP=res_"$foldern"/run$d
-                CUDA_VISIBLE_DEVICES=$mig ~/guppy_basecaller  --chunks_per_runner 768 --disable_pings --compress_fastq -i run$d  -s ${OUTP} -c dna_r9.4.1_450bps_modbases_5mc_cg_sup_prom.cfg -x auto -r --read_batch_size 250000 -q 25000 --bam_out  > res_"$foldern"/dout$d.txt 
+		echo processing sample $foldern for folder run$d
+		OUTP=res_"$foldern"/run$d
+		CUDA_VISIBLE_DEVICES=$mig ~/guppy_basecaller  --chunks_per_runner 768 \
+			--disable_pings --compress_fastq -i run$d  -s ${OUTP} \
+		       	-c dna_r9.4.1_450bps_modbases_5mc_cg_sup_prom.cfg \
+			-x auto -r --read_batch_size 250000 -q 25000 --bam_out  > res_"$foldern"/dout$d.txt 
 		echo finished run$d
 	} &
-	
 	((d=d+1))
 	done
-
-
 	wait
-
-	echo done all calculations for sample "$foldern", now copying results from res_"$foldern" folder to ../mountfolder/all_bam_res/res_"$foldern" folder
-        mkdir -p ../mountfolder/all_bam_res/res_"$foldern"
-
-        gsutil -q -m rsync -r res_"$foldern" gs://foundin_long_short/all_bam_res/res_"$foldern"
-	for d in {1..8} #Please change this if you are not using 4 GPUs with 2MIGs/GPU
-	do
-	mkdir -p ../mountfolder/all_bam_res/res_"$foldern"/run$d
-        gsutil -q -m rsync -r res_"$foldern"/run$d gs://foundin_long_short/all_bam_res/res_"$foldern"/run$d
-
-	 mkdir -p ../mountfolder/all_bam_res/res_"$foldern"/run$d/pass
-        gsutil -q -m rsync -r res_"$foldern"/run$d/pass gs://foundin_long_short/all_bam_res/res_"$foldern"/run$d/pass
-
-
-	 mkdir -p ../mountfolder/all_bam_res/res_"$foldern"/run$d/fail
-        gsutil -q -m rsync -r res_"$foldern"/run$d/fail gs://foundin_long_short/all_bam_res/res_"$foldern"/run$d/fail
-
-	rm -r run$d
-	done
-
-
-	echo copied data from res_"$foldern" folder for sample "$foldern" to gs://foundin_long_short/all_bam_res/res_"$foldern"
-	echo NOW deleting all files and preparing for next sample
-	rm -r "$foldern"
-	rm -r res_"$foldern"
-
+	
+	echo done sample "$foldern", copying res_"$foldern" to /niadatastore_output/new_bam_results/res_"$foldern" folder
 	t2=`date +%s`
-
+	#echo Guppy End time is "$t2"
 	t=$((t2-t1))
+	echo TOTAL TIME FOR SAMPLE "$foldern" is: $t
+        mkdir -p /niadatastore_output/new_bam_results/res_"$foldern"
+    t111=`date +%s`
+    #echo Results Copy Start time is "$t111"
 
-	echo TOTAL TIME FOR SAMPLE "$foldern" is: $(($t/3600)) Hours
-
+    rsync -r res_"$foldern"/ /niadatastore_output/new_bam_results/res_"$foldern"/
+    
+    t222=`date +%s`
+    #echo Results Copy End time is "$t222"
+    tt=$((t222-t111))
+    echo Total Results Copy time is $tt
+    echo NOW deleting all files and preparing for next sample
+    rm dout*
+    rm -r run*
+	rm -r "$foldern"
+    rm -r res_"$foldern"
+    ((i=i+1))
 done
+te=`date +%s`
 
-#THIS makes sure that VM is shutdown when all jobs are finished.
+tall=$((te-ts))
+echo All samples time is: $tall
 
-sudo shutdown
+echo DONE All samples, now ABORTING
+sudo shutdown #shutdown after all jobs are done
