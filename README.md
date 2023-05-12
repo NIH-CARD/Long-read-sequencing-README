@@ -28,7 +28,7 @@ __(Super accuracy Model dna_r9.4.1_450bps_modbases_5mc_cg_sup_prom.cfg)__
     samples at **1.2 TB** and **$145.73** for average DNA samples at
     **1.2 TB**.
 
-We have developed a __[shiny app](https://lrseqapp.shinyapps.io/lrapp/)__ for optimized resource and cost estimation for DNA and RNA samples using A100 GPU in MIG mode for basecalling and methylation calling. This repo also includes scripts for quality measures for long read fastq file, mapping of unmapped BAM files and variant calling. Some general purpose post processing scripts are also included in the repo.  
+We have also developed a __[shiny app](https://lrseqapp.shinyapps.io/lrapp/)__ for optimized resource and cost estimation for DNA and RNA samples using A100 GPU in MIG mode for basecalling and methylation calling. This repo also includes scripts for quality measures for long read fastq file, mapping of unmapped BAM files and variant calling. Some general purpose post processing scripts are also included in the repo.  
 
 ## Introdunction
 
